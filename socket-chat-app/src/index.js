@@ -4,25 +4,37 @@ const http = require("http");
 const { Server } = require("socket.io");
 const server = http.createServer(app);
 const io = new Server(server);
+
+let onlineUsers = {};
+
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
+
 io.on("connection", (socket) => {
-  io.emit("connection", "a user connected");
+  let nickname = "";
+
+  socket.on("set nickname", (name) => {
+    nickname = name;
+    onlineUsers[socket.id] = nickname;
+    io.emit("user connected", { nickname, onlineUsers });
+  });
+
   socket.on("disconnect", () => {
-    console.log("user disconnected");
+    delete onlineUsers[socket.id];
+    io.emit("user disconnected", { nickname, onlineUsers });
   });
-});
 
-io.on("connection", (socket) => {
   socket.on("chat message", (msg) => {
-    console.log("message: " + msg);
+    socket.broadcast.emit("chat message", { nickname, msg });
   });
-});
 
-io.on("connection", (socket) => {
-  socket.on("chat message", (msg) => {
-    io.emit("chat message", msg);
+  socket.on("typing", () => {
+    socket.broadcast.emit("typing", { nickname });
+  });
+
+  socket.on("stop typing", () => {
+    socket.broadcast.emit("stop typing", { nickname });
   });
 });
 
